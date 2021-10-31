@@ -12,27 +12,37 @@
 #  Created by Xiao Li on 23-03-2020.
 #  Copyright (c) 2020. All rights reserved.
 import numpy as np
-import matplotlib.pyplot as pyplot
+import matplotlib.pyplot as plt
 import argparse
 import torch
+import pdb
+import seaborn as sns
+import pickle
+import os
+import shutil
+import pathlib
+import glob
+import imageio as io
+from tqdm import tqdm
 
-parser = argparse.ArgumentParser()
-parser.add_argument("--xfile", type=str, default="mnist2500_X.txt", help="file name of feature stored")
-parser.add_argument("--yfile", type=str, default="mnist2500_labels.txt", help="file name of label stored")
-parser.add_argument("--cuda", type=int, default=1, help="if use cuda accelarate")
+def str2bool(mystr):
+    if mystr.lower() == "true":
+        return True
+    else:
+        return False
 
-opt = parser.parse_args()
-print("get choice from args", opt)
-xfile = opt.xfile
-yfile = opt.yfile
+def gethist(img):
+    if len(img.shape) == 3:
+        #img = np.repeat(img[:, :, np.newaxis], 3, axis=2)
+        img = img.mean(axis=2)
+        
+    img = img.flatten()
+    b, bins, patches = plt.hist(img, 255)
 
-if opt.cuda:
-    print("set use cuda")
-    torch.set_default_tensor_type(torch.cuda.DoubleTensor)
-else:
-    torch.set_default_tensor_type(torch.DoubleTensor)
-
-
+    return b 
+    
+    
+    
 def Hbeta_torch(D, beta=1.0):
     P = torch.exp(-D.clone() * beta)
 
@@ -125,7 +135,7 @@ def pca_torch(X, no_dims=50):
     return Y
 
 
-def tsne(X, no_dims=2, initial_dims=50, perplexity=30.0):
+def tsne(X, no_dims=2, initial_dims=50, perplexity=30.0,max_iter=100):
     """
         Runs t-SNE on the dataset in the NxD array X to reduce its
         dimensionality to no_dims dimensions. The syntaxis of the function is
@@ -143,7 +153,6 @@ def tsne(X, no_dims=2, initial_dims=50, perplexity=30.0):
     # Initialize variables
     X = pca_torch(X, initial_dims)
     (n, d) = X.shape
-    max_iter = 1000
     initial_momentum = 0.5
     final_momentum = 0.8
     eta = 500
@@ -155,11 +164,12 @@ def tsne(X, no_dims=2, initial_dims=50, perplexity=30.0):
 
     # Compute P-values
     P = x2p_torch(X, 1e-5, perplexity)
+    P = torch.nan_to_num(P,0)
     P = P + P.t()
     P = P / torch.sum(P)
     P = P * 4.    # early exaggeration
     print("get P shape", P.shape)
-    P = torch.max(P, torch.tensor([1e-21]))
+    P = torch.max(P, torch.tensor([1e-21])) #remove zeros?
 
     # Run iterations
     for iter in range(max_iter):
@@ -188,7 +198,6 @@ def tsne(X, no_dims=2, initial_dims=50, perplexity=30.0):
         iY = momentum * iY - eta * (gains * dY)
         Y = Y + iY
         Y = Y - torch.mean(Y, 0)
-
         # Compute current value of cost function
         if (iter + 1) % 10 == 0:
             C = torch.sum(P * torch.log(P / Q))
@@ -203,30 +212,77 @@ def tsne(X, no_dims=2, initial_dims=50, perplexity=30.0):
 
 
 if __name__ == "__main__":
-    print("Run Y = tsne.tsne(X, no_dims, perplexity) to perform t-SNE on your dataset.")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--indir", type=str)
+    parser.add_argument("--outdir",type=str)
+    parser.add_argument("--function",type=str,choices=["tsne","lab","mean"])
+    parser.add_argument("--cuda", type=int, default=1, help="if use cuda accelarate")
+    parser.add_argument("--max_iter",type=int,default=100, help="max iterations of gradient descent")
+    parser.add_argument("--dims",type=int,default=2,help="number of output dimensions")
+    parser.add_argument("--quick",type=str2bool)
 
-    X = np.loadtxt(xfile)
-    X = torch.Tensor(X)
-    labels = np.loadtxt(yfile).tolist()
+    opt = parser.parse_args()
+    print("get choice from args", opt)
+    
+    indir = opt.indir
+    outdir = opt.outdir
+    #load imgs
+    
+    if opt.quick:
+        nrimgs = 10
+    else:
+        nrimgs = None
+    
+    imgs = {}
+    
+    print("Loading Images")
+    for ext in ["*.jpg"]:#,"*.png","*.jpeg"]:
+        for file in tqdm(glob.glob(os.path.join(indir,ext))[0:nrimgs]):
+            filename = file.split('/')[-1]
+            imgs[filename] = io.imread(file)
+    
+    
+    if opt.function == "tsne":
+        
+        #get histvals, later all kinds of image features can be inserted
+        #should also be possible with saved features
+        
+        labels = list(imgs.keys())
+        vals = []
+        print("Getting Histograms")
+        for label in tqdm(labels):
+            vals.append(gethist(imgs[label]))
 
-    # confirm that x file get same number point than label file
-    # otherwise may cause error in scatter
-    assert(len(X[:, 0])==len(X[:,1]))
-    assert(len(X)==len(labels))
+            
+        
+        if opt.cuda:
+            print("set use cuda")
+            torch.set_default_tensor_type(torch.cuda.DoubleTensor)
+        else:
+            torch.set_default_tensor_type(torch.DoubleTensor)
 
-    with torch.no_grad():
-        Y = tsne(X, 2, 50, 20.0)
 
-    if opt.cuda:
-        Y = Y.cpu().numpy()
 
-    # You may write result in two files
-    # print("Save Y values in file")
-    # Y1 = open("y1.txt", 'w')
-    # Y2 = open('y2.txt', 'w')
-    # for i in range(Y.shape[0]):
-    #     Y1.write(str(Y[i,0])+"\n")
-    #     Y2.write(str(Y[i,1])+"\n")
+        X = torch.Tensor(vals)
 
-    pyplot.scatter(Y[:, 0], Y[:, 1], 20, labels)
-    pyplot.show()
+        X = X/X.max() #normalize
+
+
+
+        with torch.no_grad():
+            Y = tsne(X, opt.dims, 50, 20.0,max_iter=opt.max_iter)
+
+        if opt.cuda:
+            Y = Y.cpu().numpy()
+
+        Y = Y.flatten()
+
+        Y = Y - min(Y)
+        Y = np.round(Y,1)
+        Y = list(Y)
+    
+    for val,filename in zip(Y,labels):
+        io.imwrite(os.path.join(outdir,str(val)+"_"+filename),imgs[filename])
+
+        
+    
