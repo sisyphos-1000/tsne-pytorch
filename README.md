@@ -1,16 +1,15 @@
-# t-SNE pytorch Implementation with CUDA
+# 1D t-SNE pytorch Implementation with CUDA
 `pytorch` implementation of algorithm described in [Visualizing Data using t-SNE](https://lvdmaaten.github.io/publications/papers/JMLR_2014.pdf). This code support cuda accelerating.
+
+Sort a set of images by providing input and output directory and a featuretype (histogram or pixelvalues)
 
 ## How to use it
 Just download the repository, and the unzip mnist2500_X.zip or put feature file and labels file with code
-1. run without cuda support
+1. run with cuda support
 ```bash
-python tsne_torch.py --xfile mnist2500_X.txt --yfile mnist2500_labels.txt --cuda 0
+ü#python tsne_torch.py --indir ../Pictures/mnist/in --outdir ../Pictures/mnist/sorted --function tsne --max_iter 300 --dims 1 --nrimgs 400 --feattype pix --cuda 1
 ```
-2.run with cuda support 
-```bash
-python tsne_torch.py --xfile mnist2500_X.txt --yfile mnist2500_labels.txt --cuda 1
-```
+
 
 ## Requirements
 * pytorch
@@ -19,12 +18,12 @@ python tsne_torch.py --xfile mnist2500_X.txt --yfile mnist2500_labels.txt --cuda
 
 ## Example
 This is our result compare to result of python implementation.
-* pytorch result
+* input folder
 
-![pytorch result](images/mnist_before.png)
-* python result
+![input folder](images/mnist_before.png)
+* output folder
 
-![python result](images/mnist_after.png)
+![output folder](images/mnist_after.png)
 
 
 
