@@ -4,10 +4,9 @@
 Sort a set of images by providing input and output directory and a featuretype (histogram or pixelvalues)
 
 ## How to use it
-Just download the repository, and the unzip mnist2500_X.zip or put feature file and labels file with code
-1. run with cuda support
+
 ```bash
-ü#python tsne_torch.py --indir ../Pictures/mnist/in --outdir ../Pictures/mnist/sorted --function tsne --max_iter 300 --dims 1 --nrimgs 400 --feattype pix --cuda 1
+python tsne_torch.py --indir ../Pictures/mnist/in --outdir ../Pictures/mnist/sorted --function tsne --max_iter 300 --dims 1 --nrimgs 400 --feattype pix --cuda 1
 ```
 
 
