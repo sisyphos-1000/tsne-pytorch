@@ -124,7 +124,7 @@ def pca_torch(X, no_dims=50):
     (n, d) = X.shape
     X = X - torch.mean(X, 0)
 
-    (l, M) = torch.eig(torch.mm(X.t(), X), True)
+    (l, M) = torch.eig(torch.mm(X.t(), X),True)
     # split M real
     for i in range(d):
         if l[i, 1] != 0:
@@ -216,10 +216,11 @@ if __name__ == "__main__":
     parser.add_argument("--indir", type=str)
     parser.add_argument("--outdir",type=str)
     parser.add_argument("--function",type=str,choices=["tsne","lab","mean"])
+    parser.add_argument("--feattype",type=str,choices=["hist","histcolor","pix"])
     parser.add_argument("--cuda", type=int, default=1, help="if use cuda accelarate")
     parser.add_argument("--max_iter",type=int,default=100, help="max iterations of gradient descent")
     parser.add_argument("--dims",type=int,default=2,help="number of output dimensions")
-    parser.add_argument("--quick",type=str2bool)
+    parser.add_argument("--nrimgs",type=int)
 
     opt = parser.parse_args()
     print("get choice from args", opt)
@@ -228,16 +229,13 @@ if __name__ == "__main__":
     outdir = opt.outdir
     #load imgs
     
-    if opt.quick:
-        nrimgs = 10
-    else:
-        nrimgs = None
+
     
     imgs = {}
     
     print("Loading Images")
-    for ext in ["*.jpg"]:#,"*.png","*.jpeg"]:
-        for file in tqdm(glob.glob(os.path.join(indir,ext))[0:nrimgs]):
+    for ext in ["*.jpg","*.png","*.jpeg"]:
+        for file in tqdm(glob.glob(os.path.join(indir,ext))[0:opt.nrimgs]):
             filename = file.split('/')[-1]
             imgs[filename] = io.imread(file)
     
@@ -249,9 +247,14 @@ if __name__ == "__main__":
         
         labels = list(imgs.keys())
         vals = []
-        print("Getting Histograms")
-        for label in tqdm(labels):
-            vals.append(gethist(imgs[label]))
+
+        if opt.feattype == "hist":
+            print("Getting Histograms")
+            for label in tqdm(labels):
+                vals.append(gethist(imgs[label]))
+        else:
+            for label in tqdm(labels):
+                vals.append(imgs[label].flatten())
 
             
         
@@ -268,9 +271,8 @@ if __name__ == "__main__":
         X = X/X.max() #normalize
 
 
-
         with torch.no_grad():
-            Y = tsne(X, opt.dims, 50, 20.0,max_iter=opt.max_iter)
+            Y = tsne(X, opt.dims, 100, 30.0,max_iter=opt.max_iter)
 
         if opt.cuda:
             Y = Y.cpu().numpy()
